@@ -140,25 +140,70 @@ int set_speed(int speed)
     return ret;
 }
 
-int get_speed(int temperature)
+int write_duty(int duty) {
+    char buffer[16];
+    snprintf(buffer, 15, "%d", duty);
+    return write_pwmchip_pwm_value(pwmchip_id, pwmchip_gpio_id, "duty_cycle", buffer);
+}
+
+int set_duty(int duty) {
+    static int last_duty = -1;
+    int ret = 0;
+    if (duty < -1 || duty >= temp_map[temp_map_size - 1].duty)
+    {
+        return 0;
+    }
+
+    if (last_duty == duty)
+    {
+        return 0;
+    }
+
+    if (last_duty <= 0 && duty > 0)
+    {
+        write_duty(duty);
+        usleep(100000);
+    }
+
+    ret = write_duty(duty);
+    last_duty = duty;
+    return ret;
+}
+
+int get_duty(float temperature)
 {
-    int i = 0;
     int speed = 0;
     static int last_speed = -1;
     static int last_temperature = -1;
     static int count = 0;
 
-    for (i = temp_map_size - 1; i >= 0; i--)
-    {
-        if (temperature > temp_map[i].temp)
+    // Below first value, fan will run at min speed.
+    if (temperature <= temp_map[0].temp) {
+        speed = temp_map[0].duty;
+        if (last_speed < speed)
+            count = temp_map[0].duration;
+    }
+    // Above last value, fan will run at max speed
+    else if (temperature >= temp_map[temp_map_size - 1].temp) {
+        speed = temp_map[temp_map_size - 1].duty;
+        if (last_speed < speed)
+            count = temp_map[temp_map_size - 1].duration;
+    }
+    // If temperature is between 2 steps, fan speed is calculated by linear interpolation
+    else {
+        for (size_t i = 0; i < temp_map_size - 1; i++)
         {
-            speed = temp_map[i].speed;
-            if (last_speed < speed)
-            {
-                count = temp_map[i].duration;
-            }
+            if (temperature >= temp_map[i].temp && temperature < temp_map[i + 1].temp) {
+                speed = (int)   ((temp_map[i + 1].duty - temp_map[i].duty)
+                                / (temp_map[i + 1].temp - temp_map[i].temp)
+                                * (temperature - temp_map[i].temp)
+                                + temp_map[i].duty);
 
-            break;
+                if (last_speed < speed)
+                    count = temp_map[i].duration;
+
+                break;
+            }
         }
     }
 
@@ -636,12 +681,12 @@ int main(int argc, char *argv[])
         }
 
         temperatrue = atoi(buff);
-        speed_set = get_speed(temperatrue / 1000);
-        set_speed(speed_set);
+        int duty = get_duty(temperatrue / 1000);
+        set_duty(duty);
 
         if (!is_daemon)
         {
-            printf("speed:%d  temperatrue:%d\n", speed_set, temperatrue);
+            printf("speed:%d  temperatrue:%d\n", duty, temperatrue);
         }
     }
     close(fd_temperature);
