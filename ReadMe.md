@@ -36,6 +36,7 @@ configuration file locations is `/etc/fan-control.json`, Configuration parameter
 |temp|temperature, in degrees Celsius|
 |duty|duty ratio|
 |duration|duration, in second|
+|fan_pwm_path|path to pwm device|
 
 
 License

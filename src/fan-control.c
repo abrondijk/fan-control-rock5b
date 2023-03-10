@@ -40,11 +40,11 @@ int pidfile_fd = 0;
 int pwmchip_id = -1;
 int pwmchip_gpio_id = 0;
 int pwm_period = 10000;
+char* fan_pwm_path = "/sys/devices/platform/fd8b0010.pwm/pwm";
 
 #define DEFAULT_PID_PATH "/run/fan-control.pid"
 #define DEFAULT_CONF_PATH "/etc/fan-control.json"
 
-#define FAN_PWM_PATH "/sys/devices/platform/fd8b0010.pwm/pwm"
 #define TEMP_PATH "/sys/class/thermal/thermal_zone0/temp"
 
 struct temp_map_struct
@@ -91,19 +91,20 @@ int write_value(const char *file, const char *value)
 int write_pwmchip_value(int chipId, const char *key, const char *value)
 {
     char file[1024];
-    snprintf(file, 1024, "%s/pwmchip%d/%s", FAN_PWM_PATH, chipId, key);
+    snprintf(file, 1024, "%s/pwmchip%d/%s", fan_pwm_path, chipId, key);
     return write_value(file, value);
 }
 
 int write_pwmchip_pwm_value(int chipId, int pwm, const char *key, const char *value)
 {
     char file[1024];
-    snprintf(file, 1024, "%s/pwmchip%d/pwm%d/%s", FAN_PWM_PATH, chipId, pwm, key);
+    snprintf(file, 1024, "%s/pwmchip%d/pwm%d/%s", fan_pwm_path, chipId, pwm, key);
     return write_value(file, value);
 }
 
 int write_speed(int speed)
 {
+    int temp_map_size = sizeof(default_temp_map) / sizeof(struct temp_map_struct);
     if (speed >= temp_map_size)
     {
         return -1;
@@ -376,6 +377,18 @@ int parser_conf_json(const char *data)
         }
 
         pwm_period = json_getInteger(periodfield);
+    }
+
+    json_t const *pwm_pathfield = json_getProperty(parent, "fan_pwm_path");
+    if (pwm_pathfield != NULL)
+    {
+        if (json_getType(pwm_pathfield) != JSON_TEXT)
+        {
+            printf("Invalid fan_pwm_path field.\n");
+            goto errout;
+        }
+
+        fan_pwm_path = json_getValue(pwm_pathfield);
     }
 
     json_t const *temp_map_array = json_getProperty(parent, "temp-map");
