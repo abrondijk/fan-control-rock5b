@@ -249,6 +249,7 @@ int init_pwm_GPIO()
             printf("Failed to init pwmchip%d GPIO %d, %s\n", pwmchip_id, pwmchip_gpio_id, strerror(errno));
             return -1;
         }
+        return 0;
     }
 
     for (int i = 0; i < 6; i++)
